@@ -1,0 +1,42 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Environment variables
+.env
+.env.*
+
+# Build outputs
+dist/
+build/
+out/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cache directories
+.cache/
+.npm/
+.yarn/
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+
+# Debug and profiling
+*.cpuprofile
+*.heapprofile
