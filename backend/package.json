@@ -6,21 +6,29 @@
   "scripts": {
     "dev": "nodemon src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "author": "Lantz Hawthorne",
   "license": "MIT",
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
     "@types/node": "^22.15.30",
+    "@types/pg": "^8.15.4",
+    "drizzle-kit": "^0.31.4",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@huggingface/inference": "^2.8.1",
     "@langchain/community": "^0.3.45",
+    "cors": "^2.8.5",
     "dotenv": "^16.5.0",
+    "drizzle-orm": "^0.44.3",
     "express": "^5.1.0",
-    "langchain": "^0.3.27"
+    "langchain": "^0.3.27",
+    "postgres": "^3.4.7"
   }
 }

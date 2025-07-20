@@ -1,88 +1,58 @@
 // src/index.ts
 import dotenv from "dotenv";
 import path from "path";
-import { HuggingFaceInference } from "@langchain/community/llms/hf";
-import { BufferWindowMemory } from "langchain/memory";
+import express from "express";
+import cors from "cors";
+import { DatabaseMemory } from "./db/DatabaseMemory";
 import { ConversationChain } from "langchain/chains";
-import * as readline from "readline";
+import { milliePrompt } from "./prompts/millie";
+import { CloudflareLLM } from "./llms/CloudflareLLM";
 
 dotenv.config({ path: path.join(__dirname, "../../.env") });
 
-const startChat = async () => {
-  const model = new HuggingFaceInference({
-    model: "meta-llama/Llama-3.1-8B-Instruct",
-    apiKey: process.env.HUGGINGFACEHUB_API_KEY,
-    maxTokens: 100,
-    stopSequences: ["Human:", "\nHuman:", "User:"],
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const setupChatAPI = async () => {
+  const model = new CloudflareLLM({
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
+    apiToken: process.env.CLOUDFLARE_API_TOKEN!,
+    maxTokens: 250,
   });
 
-  // Create memory to remember last 5 exchanges (10 messages total)
-  const memory = new BufferWindowMemory({
-    k: 5, // Remember last 5 conversation turns
-    memoryKey: "history",
-    inputKey: "input",
-    outputKey: "response",
-  });
+  const memory = new DatabaseMemory("default_user", 5);
 
-  // Create conversation chain with memory
+  //Create conversation chain with memory
   const chain = new ConversationChain({
     llm: model,
     memory: memory,
+    prompt: milliePrompt,
     verbose: false,
   });
+  app.post("/api/chat", async (req, res) => {
+    try {
+      const { message } = req.body;
+      console.log("🔍 Received message:", message);
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
+      const response = await chain.call({ input: message.trim() });
+
+      res.json({ response: response.response });
+    } catch (error) {
+      console.error("❌ Chain Error:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({
+        error: "Sorry, I'm having trouble right now.",
+        details: errorMessage,
+      });
+    }
   });
 
-  console.log(
-    "🤖 Millie: Hello! I'm Millie, your caring assistant. How are you feeling today?"
-  );
-  console.log("(Type 'exit' to quit)\n");
-
-  const chat = () => {
-    rl.question("You: ", async (input) => {
-      if (input.toLowerCase() === "exit") {
-        console.log("🤖 Millie: Take care! 💙");
-        rl.close();
-        return;
-      }
-
-      if (input.trim() === "") {
-        console.log("🤖 Millie: Please say something. I'm here to listen! 💬");
-      } else {
-        console.log("🤖 Millie is thinking...");
-
-        // Create a prompt that includes Millie's personality
-        const prompt = `You are Millie, a caring and empathetic AI assistant. Respond helpfully and warmly to the user's message.
-
-${input.trim()}`;
-
-        try {
-          const response = await chain.call({ input: prompt });
-          const cleanResponse = response.response
-            .split("Human:")[0]
-            .split("\nHuman:")[0]
-            .split("User:")[0]
-            .split("\nUser:")[0]
-            .trim();
-
-          console.log("🤖 Millie:", cleanResponse);
-        } catch (error) {
-          console.error("❌ Error:", error);
-          console.log(
-            "🤖 Millie: Sorry, I'm having trouble connecting right now. Please try again!"
-          );
-        }
-      }
-
-      // Always continue the chat loop after processing
-      chat();
-    });
-  };
-
-  chat();
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.log(`🤖 Millie API server running on port ${PORT}`);
+  });
 };
 
-startChat();
+setupChatAPI();
