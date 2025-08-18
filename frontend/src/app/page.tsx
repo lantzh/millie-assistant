@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bot, User, Send, Bird } from "lucide-react";
+import { Bot, User, Send, Bird, Flower, Flower2 } from "lucide-react";
 
 export default function Home() {
   const [message, setMessage] = useState("");
@@ -68,7 +68,7 @@ export default function Home() {
         <div className="mb-6">
           <div className="flex gap-1 items-center mb-2">
             <h1 className="text-3xl font-bold text-foreground">Millie</h1>
-            <Bird className="h-7 w-7" />
+            <Flower className="h-7 w-7" />
           </div>
           <p className="text-muted-foreground">Your caring AI assistant</p>
         </div>
@@ -93,7 +93,7 @@ export default function Home() {
                     {isMillie && (
                       <Avatar className="h-8 w-8 mt-1">
                         <AvatarFallback className="bg-primary text-primary-foreground">
-                          <Bot className="h-4 w-4" />
+                          <Flower className="h-4 w-4" />
                         </AvatarFallback>
                       </Avatar>
                     )}
