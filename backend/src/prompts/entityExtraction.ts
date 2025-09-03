@@ -31,10 +31,10 @@ export const entityExtractionPrompt = PromptTemplate.fromTemplate(`
     Return ONLY valid JSON with no additional text, comments, or formatting. If no entities found, return empty arrays for each category.
     
     Example format:
-    {
-        "medications": [{"name": "Aspirin", "dosage": "81mg", "frequency": "daily"}],
-        "medical_professionals": [{"name": "Dr. Smith", "specialty": "cardiologist", "relationship": "primary doctor"}],
-        "appointments": [{"type": "checkup", "datetime": "2024-03-15 10:00", "location": "Main Clinic", "provider": "Dr. Jones"}],
+    {{
+        "medications": [{{"name": "Aspirin", "dosage": "81mg", "frequency": "daily"}}],
+        "medical_professionals": [{{"name": "Dr. Smith", "specialty": "cardiologist", "relationship": "primary doctor"}}],
+        "appointments": [{{"type": "checkup", "datetime": "2024-03-15 10:00", "location": "Main Clinic", "provider": "Dr. Jones"}}],
         "health_conditions": [],
         "symptoms": [],
         "family_members": [],
@@ -45,12 +45,12 @@ export const entityExtractionPrompt = PromptTemplate.fromTemplate(`
         "positive_moments": [],
         "social_interactions": [],
         "daily_routine_changes": [],
-        "future_tasks": [{"task": "deposit check", "priority": "medium", "help_needed": true, "deadline": "when check arrives"}],
+        "future_tasks": [{{"task": "deposit check", "priority": "medium", "help_needed": true, "deadline": "when check arrives"}}],
         "reminders": [],
         "goals": [],
-        "trivia_interests": [{"topic": "1950s music", "difficulty": "easy", "enjoyment_level": "high"}],
+        "trivia_interests": [{{"topic": "1950s music", "difficulty": "easy", "enjoyment_level": "high"}}],
         "game_preferences": [],
-        "entertainment_requests": [{"type": "trivia", "mood": "bored", "time_of_day": "afternoon"}],
+        "entertainment_requests": [{{"type": "trivia", "mood": "bored", "time_of_day": "afternoon"}}],
         "cognitive_activities": []
-    }
+    }}
 `);

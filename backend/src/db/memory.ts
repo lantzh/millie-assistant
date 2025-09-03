@@ -1,16 +1,33 @@
 import { db, conversations } from "./index";
 import { desc, eq } from "drizzle-orm";
+import { CloudflareLLM } from "../llms/CloudflareLLM";
+import { extractEntities } from "../services/entityExtractor";
 
 export const saveConversation = async (
   userId: string,
   message: string,
-  response: string
+  response: string,
+  llm?: CloudflareLLM
 ) => {
+  let entities = null;
+  
+  // Extract entities if LLM is provided
+  if (llm) {
+    console.log("🔍 Extracting entities from conversation...");
+    const conversationText = `Human: ${message}\nAssistant: ${response}`;
+    entities = await extractEntities(conversationText, llm);
+  }
+  
   await db.insert(conversations).values({
     userId,
     message,
     response,
+    entities: entities,
   });
+  
+  if (entities) {
+    console.log("✅ Conversation saved with extracted entities");
+  }
 };
 
 export const getRecentHistory = async (

@@ -1,5 +1,5 @@
 import { CloudflareLLM } from "../llms/CloudflareLLM";
-import { entityExtractionPrompt } from "../prompts/entityExtraction.js";
+import { entityExtractionPrompt } from "../prompts/entityExtraction";
 
 interface ExtractedEntities {
   medications: Array<{ name: string; dosage: string; frequency: string }>;

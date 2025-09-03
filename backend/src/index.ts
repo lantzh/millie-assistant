@@ -21,7 +21,7 @@ const setupChatAPI = async () => {
     maxTokens: 250,
   });
 
-  const memory = new DatabaseMemory("default_user", 5);
+  const memory = new DatabaseMemory("default_user", 5, model);
 
   //Create conversation chain with memory
   const chain = new ConversationChain({
