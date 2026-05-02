@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Millie",
-  description: "Millie, you're friendly assistant",
+  description:
+    "Your caring AI companion — here to chat, remember, and help. Try asking about your day, your routines, or just say hello.",
 };
 
 export default function RootLayout({

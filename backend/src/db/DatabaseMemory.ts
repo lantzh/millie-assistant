@@ -5,17 +5,17 @@ import {
   MemoryVariables,
 } from "@langchain/core/memory";
 import { saveConversation, getRecentHistory } from "./memory";
-import { CloudflareLLM } from "../llms/CloudflareLLM";
+import { LLM } from "@langchain/core/language_models/llms";
 
 export class DatabaseMemory extends BaseMemory {
   private userId: string;
   private k: number;
-  private llm?: CloudflareLLM;
+  private llm?: LLM;
 
   constructor(
     userId: string = "default_user",
     k: number = 5,
-    llm?: CloudflareLLM
+    llm?: LLM
   ) {
     super();
     this.userId = userId;

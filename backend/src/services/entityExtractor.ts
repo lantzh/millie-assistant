@@ -1,4 +1,4 @@
-import { CloudflareLLM } from "../llms/CloudflareLLM";
+import { LLM } from "@langchain/core/language_models/llms";
 import { entityExtractionPrompt } from "../prompts/entityExtraction";
 
 interface ExtractedEntities {
@@ -91,7 +91,7 @@ interface ExtractedEntities {
 
 export async function extractEntities(
   conversationText: string,
-  llm: CloudflareLLM
+  llm: LLM
 ): Promise<ExtractedEntities | null> {
   try {
     console.log("🔍 Extracting entities from conversation...");
@@ -102,7 +102,7 @@ export async function extractEntities(
     });
 
     // Call the LLM for JSON response
-    const response = await llm._call(prompt);
+    const response = await llm.invoke(prompt);
 
     // Parse the JSON response
     const cleanedResponse = response.trim();

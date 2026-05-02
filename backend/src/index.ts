@@ -6,7 +6,7 @@ import cors from "cors";
 import { DatabaseMemory } from "./db/DatabaseMemory";
 import { ConversationChain } from "langchain/chains";
 import { milliePrompt } from "./prompts/millie";
-import { CloudflareLLM } from "./llms/CloudflareLLM";
+import { GroqLLM } from "./llms/GroqLLM";
 
 dotenv.config({ path: path.join(__dirname, "../../.env") });
 
@@ -15,10 +15,9 @@ app.use(cors());
 app.use(express.json());
 
 const setupChatAPI = async () => {
-  const model = new CloudflareLLM({
-    accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
-    apiToken: process.env.CLOUDFLARE_API_TOKEN!,
-    maxTokens: 250,
+  const model = new GroqLLM({
+    apiKey: process.env.GROQ_API_KEY!,
+    maxTokens: 800,
   });
 
   const memory = new DatabaseMemory("default_user", 5, model);

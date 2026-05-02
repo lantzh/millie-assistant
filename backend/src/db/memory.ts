@@ -1,13 +1,13 @@
 import { db, conversations } from "./index";
 import { desc, eq } from "drizzle-orm";
-import { CloudflareLLM } from "../llms/CloudflareLLM";
+import { LLM } from "@langchain/core/language_models/llms";
 import { extractEntities } from "../services/entityExtractor";
 
 export const saveConversation = async (
   userId: string,
   message: string,
   response: string,
-  llm?: CloudflareLLM
+  llm?: LLM
 ) => {
   let entities = null;
   

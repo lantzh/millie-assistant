@@ -65,18 +65,24 @@ export default function Home() {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto">
         {/* Simple Header - Just "Millie" */}
-        <div className="mb-6">
-          <div className="flex gap-1 items-center mb-2">
-            <h1 className="text-3xl font-bold text-foreground">Millie</h1>
-            <Flower className="h-7 w-7" />
+        <div className="mb-8">
+          <div className="flex gap-2 items-center mb-3">
+            <h1 className="text-4xl font-bold text-foreground tracking-tight">
+              Millie
+            </h1>
+            <Bird className="h-8 w-8 text-primary" />
           </div>
-          <p className="text-muted-foreground">Your caring AI assistant</p>
+          <p className="text-base text-muted-foreground leading-relaxed">
+            {" "}
+            Your caring AI companion — here to chat, remember, and help. Try
+            asking about your day, your routines, or just say hello!
+          </p>
         </div>
 
         {/* Messages Area */}
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <div className="h-96 overflow-y-auto space-y-4 p-4">
+        <Card className="mb-4 border-2 shadow-sm">
+          <CardContent className="p-6">
+            <div className="h-96 overflow-y-auto space-y-4 pr-2">
               {messages.map((msg, index) => {
                 const isUser = msg.startsWith("You:");
                 const isMillie = msg.startsWith("Millie:");
@@ -91,29 +97,31 @@ export default function Home() {
                   >
                     {/* Millie's avatar (left side) */}
                     {isMillie && (
-                      <Avatar className="h-8 w-8 mt-1">
+                      <Avatar className="h-9 w-9 mt-1 ring-2 ring-primary/10">
                         <AvatarFallback className="bg-primary text-primary-foreground">
-                          <Flower className="h-4 w-4" />
+                          <Bird className="h-5 w-5" />
                         </AvatarFallback>
                       </Avatar>
                     )}
 
                     {/* Message bubble */}
                     <div
-                      className={`max-w-[70%] p-3 rounded-lg ${
+                      className={`max-w-[70%] px-4 py-3 rounded-lg ${
                         isUser
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-foreground"
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "bg-muted text-foreground border border-border/50"
                       }`}
                     >
-                      <p className="text-sm leading-relaxed">{content}</p>
+                      <p className="text-[15px] leading-relaxed font-medium">
+                        {content}
+                      </p>
                     </div>
 
                     {/* User's avatar (right side) */}
                     {isUser && (
-                      <Avatar className="h-8 w-8 mt-1">
+                      <Avatar className="h-9 w-9 mt-1 ring-2 ring-secondary/10">
                         <AvatarFallback className="bg-secondary text-secondary-foreground">
-                          <User className="h-4 w-4" />
+                          <User className="h-5 w-5" />
                         </AvatarFallback>
                       </Avatar>
                     )}
@@ -123,13 +131,15 @@ export default function Home() {
 
               {isLoading && (
                 <div className="flex gap-3 justify-start">
-                  <Avatar className="h-8 w-8 mt-1">
+                  <Avatar className="h-9 w-9 mt-1 ring-2 ring-primary/10">
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      <Bot className="h-4 w-4" />
+                      <Bot className="h-5 w-5" />
                     </AvatarFallback>
                   </Avatar>
-                  <div className="bg-muted text-muted-foreground p-3 rounded-lg">
-                    <p className="text-sm italic">Millie is thinking...</p>
+                  <div className="bg-muted text-muted-foreground px-4 py-3 rounded-lg border border-border/50">
+                    <p className="text-[15px] italic font-medium">
+                      Millie is thinking...
+                    </p>
                   </div>
                 </div>
               )}
@@ -141,21 +151,21 @@ export default function Home() {
         </Card>
 
         {/* Input area */}
-        <Card>
+        <Card className="border-2 shadow-sm">
           <CardContent className="p-4">
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <Input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Type a message..."
                 disabled={isLoading}
-                className="text-base"
+                className="text-[15px] font-medium h-11 border-border/50 focus-visible:border-primary"
               />
               <Button
                 onClick={handleSendMessage}
                 disabled={isLoading || !message.trim()}
-                className="gap-2"
+                className="gap-2 h-11 px-5 font-semibold"
               >
                 <Send className="h-4 w-4" />
                 Send
