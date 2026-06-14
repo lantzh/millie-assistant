@@ -6,6 +6,7 @@ interface GroqLLMParams extends BaseLLMParams {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  jsonMode?: boolean;
 }
 
 export class GroqLLM extends LLM {
@@ -13,6 +14,7 @@ export class GroqLLM extends LLM {
   model: string;
   maxTokens: number;
   temperature: number;
+  jsonMode: boolean;
 
   constructor(params: GroqLLMParams) {
     super(params);
@@ -20,6 +22,7 @@ export class GroqLLM extends LLM {
     this.model = params.model || "llama-3.3-70b-versatile";
     this.maxTokens = params.maxTokens || 800;
     this.temperature = params.temperature || 0.7;
+    this.jsonMode = params.jsonMode ?? false;
   }
 
   _llmType() {
@@ -47,6 +50,7 @@ export class GroqLLM extends LLM {
             messages: [{ role: "user", content: prompt }],
             max_tokens: this.maxTokens,
             temperature: this.temperature,
+            ...(this.jsonMode && { response_format: { type: "json_object" } }),
           }),
         },
       );

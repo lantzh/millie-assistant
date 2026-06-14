@@ -24,10 +24,13 @@
   },
   "dependencies": {
     "@langchain/community": "^0.3.45",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "drizzle-orm": "^0.44.3",
     "express": "^5.1.0",
+    "@huggingface/transformers": "^3.0.0",
+    "@langchain/langgraph": "^0.2.0",
     "langchain": "^0.3.27",
     "postgres": "^3.4.7"
   }
