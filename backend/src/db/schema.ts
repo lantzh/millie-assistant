@@ -55,11 +55,3 @@ export const entityRelationships = pgTable(
   (t) => [uniqueIndex("rel_source_target_type_idx").on(t.sourceId, t.targetId, t.relationshipType)]
 );
 
-// Memory snapshots for conversation summaries
-export const memorySnapshots = pgTable("memory_snapshots", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().default("default_user"),
-  summary: text("summary").notNull(),
-  conversationCount: serial("conversation_count"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
