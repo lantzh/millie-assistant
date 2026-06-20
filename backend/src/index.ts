@@ -12,9 +12,10 @@ app.use(cors());
 app.use(express.json());
 
 type ReasoningEvent = { type: "reasoning"; node: string; label: string; detail: string; route?: string };
+type PipelineLogEvent = { type: "pipeline"; node: string; stage: string; status: string; detail: string };
 type ResponseEvent  = { type: "response"; text: string };
 type ErrorEvent     = { type: "error"; message: string };
-type SseEvent       = ReasoningEvent | ResponseEvent | ErrorEvent;
+type SseEvent       = ReasoningEvent | PipelineLogEvent | ResponseEvent | ErrorEvent;
 
 const NODE_LABELS: Record<string, string> = {
   loadContext:    "Loading context",
@@ -92,6 +93,14 @@ const setupChatAPI = async () => {
             detail: deriveDetail(nodeName, output),
             ...(route && { route }),
           });
+
+          const pipelineLog = output.pipelineLog as Array<{ stage: string; status: string; detail: string }> | undefined;
+          if (pipelineLog) {
+            for (const entry of pipelineLog) {
+              writeEvent({ type: "pipeline", node: nodeName, ...entry });
+            }
+          }
+
           if (nodeName === "saveAndRespond" && typeof output.responseText === "string") {
             responseText = output.responseText;
           }

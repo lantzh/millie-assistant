@@ -17,6 +17,25 @@ type ReasoningEvent = {
   route?: string;
 };
 
+type PipelineEvent = {
+  type: "pipeline";
+  node: string;
+  stage: string;
+  status: "done" | "skip" | "error";
+  detail: string;
+};
+
+type LogEvent = ReasoningEvent | PipelineEvent;
+
+const STAGE_ICONS: Record<string, string> = {
+  history:   "📜",
+  graph:     "🕸️",
+  semantic:  "🔍",
+  tools:     "🔧",
+  entities:  "🏷️",
+  embedding: "📐",
+};
+
 // ── Agent graph ────────────────────────────────────────────────────────────────
 
 const NODE_ICONS: Record<string, string> = {
@@ -172,7 +191,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState(["Millie: Hello! How can I help you today?"]);
   const [isLoading, setIsLoading] = useState(false);
-  const [reasoningEvents, setReasoningEvents] = useState<ReasoningEvent[]>([]);
+  const [logEvents, setLogEvents] = useState<LogEvent[]>([]);
   const [showReasoning, setShowReasoning] = useState(false);
   const [reasoningView, setReasoningView] = useState<"log" | "graph">("log");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -188,7 +207,7 @@ export default function Home() {
     const messageToSend = message;
     setMessage("");
     setIsLoading(true);
-    setReasoningEvents([]);
+    setLogEvents([]);
 
     try {
       const response = await fetch("http://localhost:3001/api/chat", {
@@ -216,8 +235,8 @@ export default function Home() {
           if (!line.startsWith("data: ")) continue;
           const event = JSON.parse(line.slice(6));
 
-          if (event.type === "reasoning") {
-            setReasoningEvents((prev) => [...prev, event as ReasoningEvent]);
+          if (event.type === "reasoning" || event.type === "pipeline") {
+            setLogEvents((prev: LogEvent[]) => [...prev, event as LogEvent]);
           } else if (event.type === "response") {
             setMessages((prev) => [...prev, `Millie: ${event.text}`]);
             setIsLoading(false);
@@ -380,32 +399,50 @@ export default function Home() {
 
                 {/* Log view */}
                 {reasoningView === "log" && (
-                  reasoningEvents.length === 0 ? (
+                  logEvents.length === 0 ? (
                     <p className="text-xs text-muted-foreground italic">
                       {isLoading ? "Waiting for first step…" : "Send a message to see reasoning."}
                     </p>
                   ) : (
-                    <ol className="space-y-3">
-                      {reasoningEvents.map((event, i) => (
-                        <li key={i} className="flex gap-2 text-xs">
-                          <span className="mt-0.5 shrink-0">{NODE_ICONS[event.node] ?? "▶"}</span>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-foreground leading-snug">{event.label}</p>
-                            {event.detail && (
-                              <p className="text-muted-foreground leading-snug mt-0.5 line-clamp-2 break-words">
-                                {event.detail}
-                              </p>
-                            )}
-                          </div>
-                        </li>
-                      ))}
+                    <ol className="space-y-1.5">
+                      {logEvents.map((event, i) => {
+                        if (event.type === "reasoning") {
+                          return (
+                            <li key={i} className="flex gap-2 text-xs mt-2 first:mt-0">
+                              <span className="mt-0.5 shrink-0">{NODE_ICONS[event.node] ?? "▶"}</span>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-foreground leading-snug">{event.label}</p>
+                                {event.detail && (
+                                  <p className="text-muted-foreground leading-snug mt-0.5 line-clamp-2 break-words">
+                                    {event.detail}
+                                  </p>
+                                )}
+                              </div>
+                            </li>
+                          );
+                        }
+                        // pipeline sub-row
+                        const statusColor =
+                          event.status === "error" ? "text-destructive" :
+                          event.status === "skip"  ? "text-muted-foreground/60 italic" :
+                          "text-muted-foreground";
+                        return (
+                          <li key={i} className="flex gap-1.5 text-xs pl-5 border-l border-border/50 ml-2">
+                            <span className="shrink-0 leading-snug">{STAGE_ICONS[event.stage] ?? "·"}</span>
+                            <p className={`leading-snug break-words min-w-0 ${statusColor}`}>{event.detail}</p>
+                          </li>
+                        );
+                      })}
                     </ol>
                   )
                 )}
 
                 {/* Graph view */}
                 {reasoningView === "graph" && (
-                  <AgentGraph events={reasoningEvents} isLoading={isLoading} />
+                  <AgentGraph
+                    events={logEvents.filter((e): e is ReasoningEvent => e.type === "reasoning")}
+                    isLoading={isLoading}
+                  />
                 )}
               </CardContent>
             </Card>

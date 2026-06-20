@@ -1,8 +1,5 @@
 import { db, conversations } from "./index";
 import { desc, eq, isNotNull, and } from "drizzle-orm";
-import { LLM } from "@langchain/core/language_models/llms";
-import { extractEntities } from "../services/entityExtractor";
-import { generateEmbedding, storeEmbedding } from "./embeddings";
 
 type EntityData = {
   medications?: Array<{ name: string; dosage?: string; frequency?: string }>;
@@ -18,32 +15,13 @@ export const saveConversation = async (
   userId: string,
   message: string,
   response: string,
-  llm?: LLM
-) => {
-  let entities = null;
-
-  if (llm) {
-    console.log("🔍 Extracting entities from conversation...");
-    const conversationText = `Human: ${message}\nAssistant: ${response}`;
-    entities = await extractEntities(conversationText, llm);
-  }
-
+  entities?: unknown
+): Promise<number> => {
   const [inserted] = await db
     .insert(conversations)
-    .values({ userId, message, response, entities })
+    .values({ userId, message, response, entities: entities ?? null })
     .returning({ id: conversations.id });
-
-  // Generate and store embedding in the background — doesn't block the response
-  generateEmbedding(message)
-    .then((embedding) => storeEmbedding(inserted.id, embedding))
-    .then(() => console.log(`🔍 Embedding stored for conversation ${inserted.id}`))
-    .catch((err) =>
-      console.warn("⚠️ Embedding failed:", err instanceof Error ? err.message : err)
-    );
-
-  if (entities) {
-    console.log("✅ Conversation saved with extracted entities");
-  }
+  return inserted.id;
 };
 
 export const getRecentHistory = async (

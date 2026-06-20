@@ -1,10 +1,11 @@
 import { getRecentHistory, saveConversation, getEntityFacts } from "../db/memory";
-import { generateEmbedding, findSimilarConversations, warmupEmbedder } from "../db/embeddings";
+import { generateEmbedding, findSimilarConversations, storeEmbedding, warmupEmbedder } from "../db/embeddings";
+import { getGraphContext, populateGraph } from "../db/graph";
 import { getIrisTools, callIrisTool } from "../services/irisClient";
+import { extractEntities } from "../services/entityExtractor";
 import { GroqLLM } from "../llms/GroqLLM";
-import { AgentState, Message } from "./state";
+import { AgentState, Message, PipelineEvent } from "./state";
 
-// Pre-load the embedding model so the first user message isn't slow
 warmupEmbedder().catch(() => {});
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY!;
@@ -21,6 +22,7 @@ Key traits:
 - Avoid using slang that may be unfamiliar to people born before 1960
 - Always complete your thoughts. If giving advice, prioritize the most important points first
 - You can send emails and SMS messages on behalf of the user when they ask
+- Only call send_email or send_sms when the user EXPLICITLY asks you to send something right now. Phrases like "I need to email someone", "I was thinking of texting", or "there's someone I should contact" are NOT requests to send — they are conversation. Ask clarifying questions instead.
 - If you attempted an action in a previous message and it failed, do NOT retry it automatically. Only try again if the user explicitly asks you to`;
 
 const groqLlm = new GroqLLM({ apiKey: GROQ_API_KEY, maxTokens: 800, jsonMode: true });
@@ -39,6 +41,21 @@ function historyToMessages(history: string): Message[] {
     }
     return msgs;
   }, []);
+}
+
+// LLaMA 3.x models sometimes leak their native function-call syntax into the
+// content field: <function=NAME[]ARGS</function>. This parses that format into
+// a proper ToolCall so the graph executes it normally.
+function parseLeakedFunctionSyntax(content: string): Message["tool_calls"] | null {
+  const match = content.match(/<function=(\w+)\[.*?\](\{[\s\S]*?\})<\/function>/);
+  if (!match) return null;
+  const [, name, argsStr] = match;
+  try {
+    JSON.parse(argsStr);
+    return [{ id: `call_${Date.now()}`, type: "function", function: { name, arguments: argsStr } }];
+  } catch {
+    return null;
+  }
 }
 
 async function callGroq(messages: Message[], tools?: unknown[]): Promise<Message> {
@@ -69,18 +86,56 @@ async function callGroq(messages: Message[], tools?: unknown[]): Promise<Message
   }
 
   const data = await response.json();
-  return data.choices[0].message as Message;
+  const msg = data.choices[0].message as Message;
+
+  // If the model leaked function-call syntax into content without populating tool_calls,
+  // parse it into proper tool_calls so the graph executes it correctly.
+  if (msg.content?.includes("<function=") && !msg.tool_calls?.length) {
+    const parsed = parseLeakedFunctionSyntax(msg.content);
+    if (parsed) {
+      msg.tool_calls = parsed;
+      msg.content = null;
+    }
+  }
+  // If tool_calls is populated, content containing leaked syntax is harmless noise — strip it.
+  if (msg.tool_calls?.length && msg.content?.includes("<function=")) {
+    msg.content = null;
+  }
+
+  return msg;
 }
 
 export async function loadContext(state: AgentState): Promise<Partial<AgentState>> {
   console.log("🔍 [loadContext] Loading history, memory, and tools");
+  const pipelineLog: PipelineEvent[] = [];
 
-  const [history, entityFacts] = await Promise.all([
+  const [history, entityFacts, graphResult] = await Promise.all([
     getRecentHistory(state.userId, 5),
     getEntityFacts(state.userId),
+    getGraphContext(state.userId),
   ]);
 
-  // Semantic retrieval — fails gracefully if no embeddings exist yet
+  // History log
+  const historyMessages = historyToMessages(history);
+  const turnCount = Math.floor(historyMessages.length / 2);
+  pipelineLog.push({
+    stage: "history",
+    status: turnCount > 0 ? "done" : "skip",
+    detail: turnCount > 0
+      ? `${turnCount} recent turn${turnCount !== 1 ? "s" : ""} loaded`
+      : "No conversation history yet",
+  });
+
+  // Knowledge graph log
+  pipelineLog.push({
+    stage: "graph",
+    status: graphResult.entityCount > 0 ? "done" : "skip",
+    detail: graphResult.entityCount > 0
+      ? `${graphResult.entityCount} entit${graphResult.entityCount !== 1 ? "ies" : "y"} in graph`
+      : "Knowledge graph is empty",
+  });
+
+  // Semantic retrieval
   let episodic: Array<{ message: string; response: string }> = [];
   try {
     const queryEmbedding = await generateEmbedding(state.userMessage);
@@ -88,10 +143,19 @@ export async function loadContext(state: AgentState): Promise<Partial<AgentState
   } catch (err) {
     console.warn("⚠️ [loadContext] Semantic retrieval skipped:", err instanceof Error ? err.message : err);
   }
+  pipelineLog.push({
+    stage: "semantic",
+    status: episodic.length > 0 ? "done" : "skip",
+    detail: episodic.length > 0
+      ? `${episodic.length} similar past conversation${episodic.length !== 1 ? "s" : ""} found`
+      : "No semantic matches yet",
+  });
 
-  // Build memory context to inject into the system prompt
+  // Build system prompt memory block
   const memoryParts: string[] = [];
-  if (entityFacts) {
+  if (graphResult.text) {
+    memoryParts.push(`What I know about you:\n${graphResult.text}`);
+  } else if (entityFacts) {
     memoryParts.push(`What I know about you:\n${entityFacts}`);
   }
   if (episodic.length > 0) {
@@ -106,6 +170,7 @@ export async function loadContext(state: AgentState): Promise<Partial<AgentState
     systemContent += `\n\n---\n${memoryParts.join("\n\n")}\n---`;
   }
 
+  // Load tools
   let tools: Awaited<ReturnType<typeof getIrisTools>> = [];
   try {
     tools = await getIrisTools();
@@ -114,13 +179,25 @@ export async function loadContext(state: AgentState): Promise<Partial<AgentState
     systemContent += "\n\nNOTE: Your communication tools (email, SMS) are currently unavailable. If the user asks you to send a message, tell them honestly that you're unable to right now.";
   }
 
+  // Tools log
+  const toolNames = (tools as Array<{ function?: { name?: string } }>)
+    .map((t) => t.function?.name ?? "?")
+    .filter(Boolean);
+  pipelineLog.push({
+    stage: "tools",
+    status: tools.length > 0 ? "done" : "error",
+    detail: tools.length > 0
+      ? `${tools.length} tool${tools.length !== 1 ? "s" : ""}: ${toolNames.join(", ")}`
+      : "Tools unavailable",
+  });
+
   const messages: Message[] = [
     { role: "system", content: systemContent },
-    ...historyToMessages(history),
+    ...historyMessages,
     { role: "user", content: state.userMessage.trim() },
   ];
 
-  return { messages, tools };
+  return { messages, tools, pipelineLog };
 }
 
 export async function callLlm(state: AgentState): Promise<Partial<AgentState>> {
@@ -157,12 +234,71 @@ export async function executeTools(state: AgentState): Promise<Partial<AgentStat
 
 export async function saveAndRespond(state: AgentState): Promise<Partial<AgentState>> {
   console.log("💾 [saveAndRespond] Saving conversation");
+  const pipelineLog: PipelineEvent[] = [];
 
   const responseText = state.toolError
     ? "I'm sorry, dear. I wasn't able to send that for you — there seems to be a problem with my email connection right now. I won't try again on my own, but just let me know if you'd like me to try once more."
     : (state.messages[state.messages.length - 1].content ?? "I'm sorry, I couldn't process that.");
 
-  await saveConversation(state.userId, state.userMessage, responseText, groqLlm);
+  // 1. Extract entities
+  let extractedEntities: unknown = null;
+  try {
+    const conversationText = `Human: ${state.userMessage}\nAssistant: ${responseText}`;
+    extractedEntities = await extractEntities(conversationText, groqLlm);
 
-  return { responseText };
+    type EntitySummaryField = Array<{ name?: string; condition?: string; type?: string }>;
+    const e = extractedEntities as Record<string, EntitySummaryField> | null;
+    const highlights: string[] = [];
+    if (e?.medications?.length)     highlights.push(`medications: ${e.medications.map((m) => m.name).filter(Boolean).join(", ")}`);
+    if (e?.family_members?.length)  highlights.push(`family: ${e.family_members.map((f) => f.name).filter(Boolean).join(", ")}`);
+    if (e?.health_conditions?.length) highlights.push(`conditions: ${e.health_conditions.map((c) => c.condition).filter(Boolean).join(", ")}`);
+    if (e?.activities?.length)      highlights.push(`activities: ${e.activities.map((a) => a.type).filter(Boolean).join(", ")}`);
+
+    pipelineLog.push({
+      stage: "entities",
+      status: highlights.length > 0 ? "done" : "skip",
+      detail: highlights.length > 0 ? highlights.join(" · ") : "Nothing notable to extract",
+    });
+  } catch (err) {
+    console.warn("⚠️ Entity extraction failed:", err instanceof Error ? err.message : err);
+    pipelineLog.push({ stage: "entities", status: "error", detail: "Extraction failed" });
+  }
+
+  // 2. Save to DB
+  const conversationId = await saveConversation(state.userId, state.userMessage, responseText, extractedEntities);
+
+  // 3. Generate + store embedding
+  try {
+    const embedding = await generateEmbedding(state.userMessage);
+    await storeEmbedding(conversationId, embedding);
+    pipelineLog.push({ stage: "embedding", status: "done", detail: `${embedding.length}-dim vector stored` });
+    console.log(`📐 Embedding stored for conversation ${conversationId}`);
+  } catch (err) {
+    console.warn("⚠️ Embedding failed:", err instanceof Error ? err.message : err);
+    pipelineLog.push({ stage: "embedding", status: "error", detail: "Embedding generation failed" });
+  }
+
+  // 4. Populate knowledge graph
+  if (extractedEntities) {
+    try {
+      const { entityCount, relCount } = await populateGraph(
+        state.userId,
+        extractedEntities as Parameters<typeof populateGraph>[1]
+      );
+      const newThings = entityCount + relCount;
+      pipelineLog.push({
+        stage: "graph",
+        status: newThings > 0 ? "done" : "skip",
+        detail: newThings > 0
+          ? `${entityCount} new entit${entityCount !== 1 ? "ies" : "y"}, ${relCount} new relationship${relCount !== 1 ? "s" : ""}`
+          : "No new entities to add",
+      });
+      console.log(`🕸️ Graph updated: ${entityCount} entities, ${relCount} relationships`);
+    } catch (err) {
+      console.warn("⚠️ Graph population failed:", err instanceof Error ? err.message : err);
+      pipelineLog.push({ stage: "graph", status: "error", detail: "Graph update failed" });
+    }
+  }
+
+  return { responseText, pipelineLog };
 }

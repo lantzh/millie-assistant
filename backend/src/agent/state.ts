@@ -15,6 +15,12 @@ export type Message = {
   tool_calls?: ToolCall[];
 };
 
+export type PipelineEvent = {
+  stage: string;
+  status: "done" | "skip" | "error";
+  detail: string;
+};
+
 export const StateAnnotation = Annotation.Root({
   userId: Annotation<string>(),
   userMessage: Annotation<string>(),
@@ -26,6 +32,10 @@ export const StateAnnotation = Annotation.Root({
   tools: Annotation<unknown[]>(),
   responseText: Annotation<string | null>(),
   toolError: Annotation<string | undefined>(),
+  pipelineLog: Annotation<PipelineEvent[]>({
+    reducer: (current, update) => [...current, ...update],
+    default: () => [],
+  }),
 });
 
 export type AgentState = typeof StateAnnotation.State;
