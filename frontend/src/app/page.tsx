@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bot, User, Send, Bird, ChevronRight, ChevronLeft } from "lucide-react";
+import { Bot, User, Send, Bird, ChevronRight, ChevronLeft, MessageSquarePlus, X } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -194,6 +194,15 @@ export default function Home() {
   const [logEvents, setLogEvents] = useState<LogEvent[]>([]);
   const [showReasoning, setShowReasoning] = useState(false);
   const [reasoningView, setReasoningView] = useState<"log" | "graph">("log");
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackTitle, setFeedbackTitle] = useState("");
+  const [feedbackDescription, setFeedbackDescription] = useState("");
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackResult, setFeedbackResult] = useState<{
+    issue_url: string;
+    triage: "accept" | "reject";
+    reason?: string;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -260,6 +269,36 @@ export default function Home() {
     }
   };
 
+  const handleFeedbackSubmit = async () => {
+    if (!feedbackTitle.trim() || !feedbackDescription.trim()) return;
+    setFeedbackLoading(true);
+    setFeedbackResult(null);
+    try {
+      const res = await fetch("http://localhost:3001/api/feature-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: feedbackTitle, description: feedbackDescription }),
+      });
+      const data = await res.json();
+      setFeedbackResult({
+        issue_url: data.issue_url,
+        triage: data.triage,
+        reason: data.reason,
+      });
+    } catch {
+      setFeedbackResult({ issue_url: "", triage: "reject", reason: "Failed to submit. Please try again." });
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  const closeFeedback = () => {
+    setFeedbackOpen(false);
+    setFeedbackTitle("");
+    setFeedbackDescription("");
+    setFeedbackResult(null);
+  };
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-5xl mx-auto">
@@ -275,18 +314,29 @@ export default function Home() {
               asking about your day, your routines, or just say hello!
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowReasoning((v) => !v)}
-            className="mt-1 gap-1 text-muted-foreground text-xs shrink-0"
-          >
-            {showReasoning ? (
-              <>Hide reasoning <ChevronRight className="h-3 w-3" /></>
-            ) : (
-              <>Show reasoning <ChevronLeft className="h-3 w-3" /></>
-            )}
-          </Button>
+          <div className="flex flex-col gap-2 items-end shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowReasoning((v) => !v)}
+              className="gap-1 text-muted-foreground text-xs"
+            >
+              {showReasoning ? (
+                <>Hide reasoning <ChevronRight className="h-3 w-3" /></>
+              ) : (
+                <>Show reasoning <ChevronLeft className="h-3 w-3" /></>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setFeedbackOpen(true)}
+              className="gap-1 text-muted-foreground text-xs"
+            >
+              <MessageSquarePlus className="h-3 w-3" />
+              Submit feedback
+            </Button>
+          </div>
         </div>
 
         {/* Main layout */}
@@ -449,6 +499,83 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* Feedback modal */}
+      {feedbackOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-lg border-2 shadow-xl">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-semibold text-foreground">Submit Feedback</h2>
+                <button onClick={closeFeedback} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {feedbackResult ? (
+                <div className="space-y-4">
+                  {feedbackResult.triage === "accept" ? (
+                    <>
+                      <p className="text-sm text-foreground">
+                        Your feedback has been submitted and converted into a tracked issue.
+                      </p>
+                      {feedbackResult.issue_url && (
+                        <a
+                          href={feedbackResult.issue_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary underline break-all"
+                        >
+                          {feedbackResult.issue_url}
+                        </a>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {feedbackResult.reason ?? "Your request could not be processed at this time."}
+                    </p>
+                  )}
+                  <Button onClick={closeFeedback} className="w-full">Close</Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</label>
+                    <input
+                      type="text"
+                      value={feedbackTitle}
+                      onChange={(e) => setFeedbackTitle(e.target.value)}
+                      placeholder="Brief summary of your request"
+                      className="mt-1.5 w-full rounded-md border border-border/50 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</label>
+                    <textarea
+                      value={feedbackDescription}
+                      onChange={(e) => setFeedbackDescription(e.target.value)}
+                      placeholder="Describe what you'd like Millie to do differently or what's not working..."
+                      rows={5}
+                      className="mt-1.5 w-full rounded-md border border-border/50 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" onClick={closeFeedback} disabled={feedbackLoading}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleFeedbackSubmit}
+                      disabled={feedbackLoading || !feedbackTitle.trim() || !feedbackDescription.trim()}
+                    >
+                      {feedbackLoading ? "Submitting…" : "Submit"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

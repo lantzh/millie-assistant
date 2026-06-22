@@ -4,6 +4,8 @@ import express from "express";
 import cors from "cors";
 import { graph } from "./agent/graph";
 import { Message, ToolCall } from "./agent/state";
+import { callIrisTool } from "./services/irisClient";
+import { triageRequest } from "./services/triageAgent";
 
 dotenv.config({ path: path.join(__dirname, "../../.env") });
 
@@ -113,6 +115,68 @@ const setupChatAPI = async () => {
       writeEvent({ type: "error", message: error instanceof Error ? error.message : "Unknown error" });
     } finally {
       res.end();
+    }
+  });
+
+  app.post("/api/feature-request", async (req, res) => {
+    try {
+      const { title, description } = req.body as { title: string; description: string };
+      if (!title?.trim() || !description?.trim()) {
+        res.status(400).json({ error: "title and description are required" });
+        return;
+      }
+
+      console.log("🎫 Feature request received:", title);
+
+      // 1. Create issue in GitHub with triage label
+      const createResult = await callIrisTool("create_github_issue", {
+        title,
+        body: description,
+        labels: ["triage"],
+      });
+      console.log("✅ Issue created:", createResult);
+
+      // Parse issue number from "Issue #42 created: https://..."
+      const issueMatch = createResult.match(/Issue #(\d+)/);
+      const issueNumber = issueMatch ? parseInt(issueMatch[1]) : null;
+      const urlMatch = createResult.match(/https:\/\/\S+/);
+      const issueUrl = urlMatch ? urlMatch[0] : null;
+
+      // 2. Run triage agent
+      console.log("🔍 Running triage agent...");
+      const triage = await triageRequest(title, description);
+      console.log("🤖 Triage result:", triage.action);
+
+      // 3. Update issue with triage output
+      if (issueNumber) {
+        if (triage.action === "accept") {
+          await callIrisTool("update_github_issue", {
+            issue_number: issueNumber,
+            title: triage.title,
+            body: triage.body,
+            labels: ["review"],
+          });
+        } else {
+          await callIrisTool("update_github_issue", {
+            issue_number: issueNumber,
+            body: `**Rejected:** ${triage.reason}\n\n---\n\n**Original request:**\n${description}`,
+            labels: ["wontfix"],
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        issue_number: issueNumber,
+        issue_url: issueUrl,
+        triage: triage.action,
+        ...(triage.action === "accept"
+          ? { title: triage.title }
+          : { reason: triage.reason }),
+      });
+    } catch (error) {
+      console.error("❌ Feature request error:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
