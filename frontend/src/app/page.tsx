@@ -314,29 +314,18 @@ export default function Home() {
               asking about your day, your routines, or just say hello!
             </p>
           </div>
-          <div className="flex flex-col gap-2 items-end shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowReasoning((v) => !v)}
-              className="gap-1 text-muted-foreground text-xs"
-            >
-              {showReasoning ? (
-                <>Hide reasoning <ChevronRight className="h-3 w-3" /></>
-              ) : (
-                <>Show reasoning <ChevronLeft className="h-3 w-3" /></>
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setFeedbackOpen(true)}
-              className="gap-1 text-muted-foreground text-xs"
-            >
-              <MessageSquarePlus className="h-3 w-3" />
-              Submit feedback
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowReasoning((v) => !v)}
+            className="mt-1 gap-1 text-muted-foreground text-xs shrink-0"
+          >
+            {showReasoning ? (
+              <>Hide reasoning <ChevronRight className="h-3 w-3" /></>
+            ) : (
+              <>Show reasoning <ChevronLeft className="h-3 w-3" /></>
+            )}
+          </Button>
         </div>
 
         {/* Main layout */}
@@ -412,6 +401,16 @@ export default function Home() {
                 </div>
               </CardContent>
             </Card>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setFeedbackOpen(true)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <MessageSquarePlus className="h-3 w-3" />
+                Submit feedback
+              </button>
+            </div>
           </div>
 
           {/* Reasoning panel */}
