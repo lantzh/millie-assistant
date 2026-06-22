@@ -1,7 +1,8 @@
 import { getRecentHistory, saveConversation, getEntityFacts } from "../db/memory";
 import { generateEmbedding, findSimilarConversations, storeEmbedding, warmupEmbedder } from "../db/embeddings";
 import { getGraphContext, populateGraph } from "../db/graph";
-import { getIrisTools, callIrisTool } from "../services/irisClient";
+import { callIrisTool } from "../services/irisClient";
+import { irisAgent } from "../services/irisAgent";
 import { extractEntities } from "../services/entityExtractor";
 import { GroqLLM } from "../llms/GroqLLM";
 import { AgentState, Message, PipelineEvent } from "./state";
@@ -171,9 +172,9 @@ export async function loadContext(state: AgentState): Promise<Partial<AgentState
   }
 
   // Load tools
-  let tools: Awaited<ReturnType<typeof getIrisTools>> = [];
+  let tools: unknown[] = [];
   try {
-    tools = await getIrisTools();
+    tools = await irisAgent.getTools();
   } catch (error) {
     console.warn("⚠️ [loadContext] Could not fetch Iris tools:", error instanceof Error ? error.message : error);
     systemContent += "\n\nNOTE: Your communication tools (email, SMS) are currently unavailable. If the user asks you to send a message, tell them honestly that you're unable to right now.";

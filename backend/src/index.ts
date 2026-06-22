@@ -4,7 +4,7 @@ import express from "express";
 import cors from "cors";
 import { graph } from "./agent/graph";
 import { Message, ToolCall } from "./agent/state";
-import { callIrisTool } from "./services/irisClient";
+import { irisAgent } from "./services/irisAgent";
 import { triageRequest } from "./services/triageAgent";
 
 dotenv.config({ path: path.join(__dirname, "../../.env") });
@@ -129,7 +129,7 @@ const setupChatAPI = async () => {
       console.log("🎫 Feature request received:", title);
 
       // 1. Create issue in GitHub with triage label
-      const createResult = await callIrisTool("create_github_issue", {
+      const createResult = await irisAgent.createGithubIssue({
         title,
         body: description,
         labels: ["triage"],
@@ -150,14 +150,14 @@ const setupChatAPI = async () => {
       // 3. Update issue with triage output
       if (issueNumber) {
         if (triage.action === "accept") {
-          await callIrisTool("update_github_issue", {
+          await irisAgent.updateGithubIssue({
             issue_number: issueNumber,
             title: triage.title,
             body: triage.body,
             labels: ["review"],
           });
         } else {
-          await callIrisTool("update_github_issue", {
+          await irisAgent.updateGithubIssue({
             issue_number: issueNumber,
             body: `**Rejected:** ${triage.reason}\n\n---\n\n**Original request:**\n${description}`,
             labels: ["wontfix"],
